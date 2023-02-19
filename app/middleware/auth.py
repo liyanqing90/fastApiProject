@@ -3,12 +3,13 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi import status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
-from app.sql_app.crud.auth import get_user
-from app.sql_app.schemas.schemas import TokenData,UserModel
+from app.sql_app.crud.auth import get_user_by_username
+from app.sql_app.database import get_db
+from app.sql_app.schemas.schemas import TokenData, UserCreate
 
 # 生成密钥的命令：openssl rand -hex 32
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -36,8 +37,8 @@ def get_password_hash(password):
 
 
 # 验证用户身份
-def authenticate_user(username: str, password: str):
-    user = get_user(username)
+def authenticate_user(username: str, password: str, db: Session = Depends(get_db)):
+    user = get_user_by_username(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -72,14 +73,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(username=token_data.username)
+    user = get_user_by_username(db, username=token_data.username)
     if user is None:
         raise credentials_exception
     return user
 
 
-async def get_current_active_user(current_user: UserModel = Depends(get_current_user)):
+async def get_current_active_user(current_user: UserCreate = Depends(get_current_user)):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
-

@@ -17,13 +17,13 @@ class User(Base):
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.now())
     updated_at = Column(TIMESTAMP, nullable=False, default=datetime.now())
     deleted_at = Column(BIGINT, nullable=False, default=0)
-    update_user = Column(INT, nullable=False)  # 修改人
+    # update_user = Column(INT, nullable=False)  # 修改人
     last_login_at = Column(TIMESTAMP)
     avatar = Column(String(128), nullable=True, default=None)
     # 管理员可以禁用某个用户，当他离职后
     is_valid = Column(Boolean, nullable=False, default=True, comment="是否合法")
 
-    def __init__(self, username, name, password, email, avatar=None, phone=None, is_valid=True):
+    def __init__(self, username, password, email, avatar=None, name=None, phone=None, is_valid=True):
         self.username = username
         self.password = password
         self.email = email

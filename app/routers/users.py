@@ -1,13 +1,15 @@
 from datetime import timedelta
 
-from fastapi import APIRouter
-from fastapi import Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 
 from app.middleware.auth import ACCESS_TOKEN_EXPIRE_MINUTES, get_current_active_user, authenticate_user, \
     create_access_token
-from app.sql_app.schemas.schemas import Token, UserModel
-from app.sql_app.crud.auth import UserDao
+from app.sql_app.crud.auth import get_user_by_username, SSO
+from app.sql_app.database import get_db
+from app.sql_app.schemas.schemas import Token, UserCreate, UserLogin
+
 router = APIRouter(prefix="/users", )
 
 
@@ -22,14 +24,14 @@ async def read_user_me():
 
 
 @router.get("/{username}", tags=["users"])
-async def read_user(username: str):
-    return {"username": username}
+async def read_user(username: str, db: Session = Depends(get_db)):
+    return get_user_by_username(db, username)
 
 
 @router.post("/register")
-async def register(user: UserModel):
-    print(user)
-    if UserDao.register_user(*user):
+async def register(user: UserCreate, db: Session = Depends(get_db)):
+    code = SSO(db).create_user(user=user)
+    if code == "00000":
         return {"msg": "注册成功", "data": user}
     else:
         return {"msg": "注册失败"}
@@ -51,11 +53,20 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/users/me/", response_model=UserModel)
-async def read_users_me(current_user: UserModel = Depends(get_current_active_user)):
+@router.get("/users/me/", response_model=UserCreate)
+async def read_users_me(current_user: UserCreate = Depends(get_current_active_user)):
     return current_user
 
 
 @router.get("/users/me/items/")
-async def read_own_items(current_user: UserModel = Depends(get_current_active_user)):
+async def read_own_items(current_user: UserCreate = Depends(get_current_active_user)):
     return [{"item_id": "Foo", "owner": current_user.username}]
+
+
+@router.post("/login")
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    data = SSO(db).login(user)
+    if data["code"] == "00000":
+        return data
+    else:
+        return data | {"msg": "登录失败"}

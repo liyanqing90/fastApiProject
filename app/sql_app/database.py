@@ -11,12 +11,10 @@ SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
 
-
-def get_db_session():
-    print("000000000000000000000000000000")
-    db = SessionLocal
+# Dependency
+def get_db():
+    db = SessionLocal()
     try:
-        print("****",db)
         yield db
     finally:
         db.close()

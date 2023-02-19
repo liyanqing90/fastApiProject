@@ -12,7 +12,7 @@ app.include_router(users.router)
 app.include_router(items.router)
 app.include_router(admin.router)
 
-# create_table()
+create_table()
 @app.get("/")
 async def hello():
     log = Logger("初始化")

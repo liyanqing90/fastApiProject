@@ -1,7 +1,10 @@
-from app.sql_app.database import get_db_session
-from app.sql_app.models.user import User
-from app.sql_app.schemas.schemas import UserInDB
+from datetime import datetime
+
 from sqlalchemy.orm import Session
+
+from app.sql_app.models.user import User
+from app.sql_app.schemas.schemas import UserCreate, UserLogin
+
 
 def get_user_by_username(db, username: str):
     return db.query(User).filter(User.username == username).first()
@@ -11,40 +14,34 @@ def get_user_by_email(db, email: str):
     return db.query(User).filter(User.email == email).first()
 
 
-# 模拟数据库，存储用户信息
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        "disabled": False,
-    }
-}
+def model_to_dict(model):
+    return {key: getattr(model, key) for key in model.__table__.columns.keys()}
 
 
-# 根据用户名获取用户信息
-def get_user(username: str):
-    if username in fake_users_db:
-        user_dict = fake_users_db[username]
-        return UserInDB(**user_dict)
+class SSO:
+    def __init__(self, db: Session, ):
+        self.db = db
 
-def get_users(db: Session):
-    return db.query(User).all()
-class UserDao:
-    @staticmethod
-    def register_user(username, email, password, ):
+    def create_user(self, user: UserCreate):
+        if self.db.query(User).filter(email=user.email).first():
+            return {"code": "10001"}
+        db_user = User(username=user.username, email=user.email, password=user.password)
+        self.db.add(db_user)
+        self.db.commit()
+        self.db.refresh(db_user)
+        return {"code": "00000"}
+
+    def login(self, user: UserLogin):
         try:
-            print(username)
-            with get_db_session() as db:
-                users = get_users(db)
-                if db:
-                    raise Exception("邮箱已注册")
-                pwd = password
-                user = User(username, pwd, email)
-                print("123")
-                db.session.add(user)
-                db.session.commit()
-        except:
-            raise "注册失败"
-        return "Success"
+            if not (user := self.db.query(User).filter(User.email == user.email).first()):
+                return {"code": "10001"}
+            if user.password != user.password:
+                return {"code": "10002"}
+            else:
+                user.last_login_at = datetime.now()
+                self.db.commit()
+                data = model_to_dict(user)
+                return {"code": "00000", "data": data}
+        except Exception as e:
+            print(e)
+            return {"code": "90009"}
